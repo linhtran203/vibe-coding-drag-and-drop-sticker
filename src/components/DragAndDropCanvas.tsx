@@ -14,6 +14,7 @@ interface DroppedElement {
   rotation: number;
   flipHorizontal: boolean;
   flipVertical: boolean;
+  zIndex: number;
   text?: string;
   fontFamily?: string;
   fontSize?: number;
@@ -184,7 +185,13 @@ export default function DragAndDropCanvas() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setDroppedElements(parsed.droppedElements || []);
+        const elements = parsed.droppedElements || [];
+        // Ensure all elements have zIndex, assign if missing
+        const elementsWithZIndex = elements.map((el: DroppedElement, idx: number) => ({
+          ...el,
+          zIndex: el.zIndex !== undefined ? el.zIndex : idx,
+        }));
+        setDroppedElements(elementsWithZIndex);
         setCanvasBackgroundColor(parsed.backgroundColor || "#ffffff");
         setDrawingPaths(parsed.drawingPaths || []);
       } catch (error) {
@@ -308,6 +315,7 @@ export default function DragAndDropCanvas() {
             id: `${copiedElement.type}-${Date.now()}-${Math.random()}`,
             x: Math.min(copiedElement.x + 20, rect.width - copiedElement.width),
             y: Math.min(copiedElement.y + 20, rect.height - copiedElement.height),
+            zIndex: droppedElements.length,
           };
 
           setDroppedElements((prev) => [...prev, newElement]);
@@ -352,6 +360,7 @@ export default function DragAndDropCanvas() {
                 rotation: 0,
                 flipHorizontal: false,
                 flipVertical: false,
+                zIndex: droppedElements.length,
               };
 
               setDroppedElements((prev) => [...prev, newElement]);
@@ -495,6 +504,7 @@ export default function DragAndDropCanvas() {
       rotation: 0,
       flipHorizontal: false,
       flipVertical: false,
+      zIndex: droppedElements.length,
     };
 
     setDroppedElements([...droppedElements, newElement]);
@@ -585,6 +595,7 @@ export default function DragAndDropCanvas() {
       rotation: 0,
       flipHorizontal: false,
       flipVertical: false,
+      zIndex: droppedElements.length,
     };
 
     setDroppedElements((prev) => [...prev, newElement]);
@@ -644,6 +655,7 @@ export default function DragAndDropCanvas() {
         rotation: 0,
         flipHorizontal: false,
         flipVertical: false,
+        zIndex: droppedElements.length,
       };
 
       setDroppedElements((prev) => [...prev, newElement]);
@@ -911,6 +923,60 @@ export default function DragAndDropCanvas() {
           : el
       )
     );
+  };
+
+  const handleBringForward = (elementId: string) => {
+    setDroppedElements((elements) => {
+      const index = elements.findIndex(el => el.id === elementId);
+      if (index === -1 || index === elements.length - 1) return elements;
+      
+      // Swap with next element
+      const newElements = [...elements];
+      [newElements[index], newElements[index + 1]] = [newElements[index + 1], newElements[index]];
+      
+      // Update zIndex values
+      return newElements.map((el, idx) => ({ ...el, zIndex: idx }));
+    });
+  };
+
+  const handleSendBackward = (elementId: string) => {
+    setDroppedElements((elements) => {
+      const index = elements.findIndex(el => el.id === elementId);
+      if (index === -1 || index === 0) return elements;
+      
+      // Swap with previous element
+      const newElements = [...elements];
+      [newElements[index], newElements[index - 1]] = [newElements[index - 1], newElements[index]];
+      
+      // Update zIndex values
+      return newElements.map((el, idx) => ({ ...el, zIndex: idx }));
+    });
+  };
+
+  const handleBringToFront = (elementId: string) => {
+    setDroppedElements((elements) => {
+      const element = elements.find(el => el.id === elementId);
+      if (!element) return elements;
+      
+      const filtered = elements.filter(el => el.id !== elementId);
+      const newElements = [...filtered, element];
+      
+      // Update zIndex values
+      return newElements.map((el, idx) => ({ ...el, zIndex: idx }));
+    });
+  };
+
+  const handleSendToBack = (elementId: string) => {
+    setDroppedElements((elements) => {
+      const element = elements.find(el => el.id === elementId);
+      if (!element) return elements;
+      
+      const filtered = elements.filter(el => el.id !== elementId);
+      const newElements = [element, ...filtered];
+      
+      // Update zIndex values
+      return newElements.map((el, idx) => ({ ...el, zIndex: idx }));
+    });
   };
 
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
@@ -1720,6 +1786,107 @@ export default function DragAndDropCanvas() {
                   title="Delete"
                 >
                   ×
+                </button>
+              </div>
+
+              {/* Z-Index control buttons at top - only visible on hover */}
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-20 pointer-events-none">
+                {/* Send to Back */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendToBack(element.id);
+                  }}
+                  className="w-7 h-7 bg-gray-600 text-white rounded-full flex items-center justify-center hover:bg-gray-700 shadow-lg border-2 border-white pointer-events-auto"
+                  title="Send to Back"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="17 11 12 6 7 11" />
+                    <polyline points="17 18 12 13 7 18" />
+                  </svg>
+                </button>
+
+                {/* Send Backward */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendBackward(element.id);
+                  }}
+                  className="w-7 h-7 bg-gray-500 text-white rounded-full flex items-center justify-center hover:bg-gray-600 shadow-lg border-2 border-white pointer-events-auto"
+                  title="Send Backward"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="17 11 12 6 7 11" />
+                  </svg>
+                </button>
+
+                {/* Bring Forward */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBringForward(element.id);
+                  }}
+                  className="w-7 h-7 bg-blue-500 text-white rounded-full flex items-center justify-center hover:bg-blue-600 shadow-lg border-2 border-white pointer-events-auto"
+                  title="Bring Forward"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="7 13 12 18 17 13" />
+                  </svg>
+                </button>
+
+                {/* Bring to Front */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBringToFront(element.id);
+                  }}
+                  className="w-7 h-7 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 shadow-lg border-2 border-white pointer-events-auto"
+                  title="Bring to Front"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="7 13 12 18 17 13" />
+                    <polyline points="7 6 12 11 17 6" />
+                  </svg>
                 </button>
               </div>
             </div>
